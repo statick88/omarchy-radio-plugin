@@ -43,6 +43,8 @@ Panel {
   property bool formOpen: false
   property string formError: ""
   property bool addBusy: false
+  property bool deleteBusy: false
+  property var editingId: null
   property int cursor: 0
 
   readonly property var visibleStations: filterStations()
@@ -50,7 +52,7 @@ Panel {
   function open() { root.controller.show() }
   function close() { root.controller.hide() }
   function toggle() { if (root.opened) root.close(); else root.open() }
-  function closeForm() { root.formOpen = false; root.formError = "" }
+  function closeForm() { root.formOpen = false; root.formError = ""; root.editingId = null }
 
   function parseStations(content) {
     var out = []
@@ -120,16 +122,27 @@ Panel {
     root.runControl(["play", String(id)])
   }
 
-  // S2: the form only sends what the user typed; validation, the next free
-  // id and the atomic write live in radio-control.sh add.
+  // S2/S1: the form only sends what the user typed; validation, the next free
+  // id and the atomic write live in radio-control.sh add/update.
   function submitStation() {
     var name = nameField.text.trim()
     var url = urlField.text.trim()
     root.formError = ""
     root.addBusy = true
     addProcess.running = false
-    addProcess.command = ["sh", root.pluginDir + "/radio-control.sh", "add", name, url]
+    var cmd = root.editingId !== null
+      ? ["sh", root.pluginDir + "/radio-control.sh", "update", String(root.editingId), name, url]
+      : ["sh", root.pluginDir + "/radio-control.sh", "add", name, url]
+    addProcess.command = cmd
     addProcess.running = true
+  }
+
+  function deleteStation(id) {
+    root.formError = ""
+    root.deleteBusy = true
+    deleteProcess.running = false
+    deleteProcess.command = ["sh", root.pluginDir + "/radio-control.sh", "delete", String(id)]
+    deleteProcess.running = true
   }
 
   FileView {
@@ -165,15 +178,31 @@ Panel {
     stderr: StdioCollector { id: addStderr; waitForEnd: true }
     onExited: function(exitCode) {
       root.addBusy = false
+      root.deleteBusy = false
       if (exitCode === 0) {
         root.formError = ""
         nameField.text = ""
         urlField.text = ""
+        root.editingId = null
         root.closeForm()
         return
       }
       var message = String(addStderr.text || addStdout.text || "").trim()
-      root.formError = message.length > 0 ? message.replace(/^Error:\s*/, "") : "No se pudo agregar la estación"
+      root.formError = message.length > 0 ? message.replace(/^Error:\s*/, "") : "No se pudo completar la operación"
+    }
+  }
+
+  Process {
+    id: deleteProcess
+    running: false
+    stdout: StdioCollector { id: delStdout; waitForEnd: true }
+    stderr: StdioCollector { id: delStderr; waitForEnd: true }
+    onExited: function(exitCode) {
+      root.deleteBusy = false
+      if (exitCode !== 0) {
+        var message = String(delStderr.text || delStdout.text || "").trim()
+        root.formError = message.length > 0 ? message.replace(/^Error:\s*/, "") : "No se pudo eliminar la estación"
+      }
     }
   }
 
@@ -404,6 +433,40 @@ Panel {
                   elide: Text.ElideRight
                 }
 
+                // Edit/Delete buttons (shown on hover)
+                Row {
+                  anchors.right: parent.right
+                  anchors.rightMargin: Style.space(6)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(4)
+                  visible: rowMouse.containsMouse && !root.addBusy && !root.deleteBusy
+
+                  PanelActionButton {
+                    id: editBtn
+                    iconText: "✎"
+                    tooltipText: "Editar estación"
+                    enabled: !root.addBusy && !root.deleteBusy
+                    onClicked: {
+                      var s = stationRow.modelData
+                      root.editingId = s.id
+                      nameField.text = s.name
+                      urlField.text = s.url
+                      root.formOpen = true
+                      nameField.focus = true
+                    }
+                  }
+
+                  PanelActionButton {
+                    id: deleteBtn
+                    iconText: "🗑"
+                    tooltipText: "Eliminar estación"
+                    enabled: !root.addBusy && !root.deleteBusy
+                    onClicked: {
+                      root.deleteStation(stationRow.modelData.id)
+                    }
+                  }
+                }
+
                 MouseArea {
                   id: rowMouse
                   anchors.fill: parent
@@ -421,14 +484,15 @@ Panel {
           foreground: Color.foreground
         }
 
-        // ── Add-station form (S2) ──────────────────────────────────────
+        // ── Station form (add / edit) ───────────────────────────────────────────
         Column {
           visible: root.formOpen
           width: parent.width
           spacing: Style.space(6)
 
           Text {
-            text: "Agregar estación"
+            id: formTitle
+            text: root.editingId !== null ? "Editar estación" : "Agregar estación"
             color: Color.foreground
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
@@ -467,8 +531,9 @@ Panel {
             spacing: Style.space(6)
 
             PanelActionButton {
+              id: saveBtn
               iconText: " "
-              tooltipText: "Guardar estación"
+              tooltipText: root.editingId !== null ? "Actualizar estación" : "Guardar estación"
               enabled: nameField.text.trim().length > 0 && urlField.text.trim().length > 0 && !root.addBusy
               onClicked: root.submitStation()
             }

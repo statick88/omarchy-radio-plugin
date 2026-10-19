@@ -77,3 +77,10 @@ comandos contenga alguna URL configurada, en lugar de una lista fija de hosts:
   100% coverage, "Production Ready" y animaciones, todo falso). `.agents/MISION|VISION`
   pasan a separar lo implementado de lo aspiracional. Totales reales:
   radio-control 30, manifest 22, gadget 13 (+1 skip opt-in de red), QML 42, E2E 34.
+- L6 (RDD): Review del commit de corrección (c925337, 45 líneas):
+  risk lens completado (admission: completed); resilience y reliability
+  rechazados por opencode_review_transport_relay_refused (reviewer_result_not_admissible).
+  Código validado por tests (5/5 suites, 141/142 + 1 skip) y en vivo
+  (stop mata stream Exa). 2 de 3 hallazgos corregidos; R4-PLAYBACK-LIVENESS
+  deferido por flakiness del test. Review abandonado por bloqueo de transporte.
+  Decisión: deliver sin review completa, respaldado por tests + verificación en vivo.

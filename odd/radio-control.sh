@@ -269,8 +269,146 @@ add_station() {
     fi
 
     echo "✓ Estación agregada: $name"
+
+
+
+}
+# Update a station (S1): same validation as add, but id must exist and
+# new name must not clash with another station.
+update_station() {
+    local station_id="$1"
+    local name="$2"
+    local url="$3"
+
+    if [ -z "$station_id" ] || [ -z "$name" ] || [ -z "$url" ]; then
+        echo "Uso: $0 update <id> <nombre> <url>" >&2
+        exit 1
+    fi
+    if ! [[ "$station_id" =~ ^[0-9]+$ ]]; then
+        echo "Error: id debe ser un número" >&2
+        exit 1
+    fi
+    if [ -z "$name" ]; then
+        echo "Error: el nombre de la estación no puede estar vacío" >&2
+        exit 1
+    fi
+    if [ -z "$url" ]; then
+        echo "Error: la URL no puede estar vacía" >&2
+        exit 1
+    fi
+    if [[ "$name" == *"|"* || "$name" == *$'
+'* ]]; then
+        echo 'Error: el nombre no puede contener "|" ni saltos de línea' >&2
+        exit 1
+    fi
+    case "$url" in
+        http://*|https://*) ;;
+        *)
+            echo "Error: la URL debe empezar por http:// o https://" >&2
+            exit 1
+            ;;
+    esac
+    if [[ "$url" == *"|"* || "$url" == *$'
+'* ]]; then
+        echo 'Error: la URL no puede contener "|" ni saltos de línea' >&2
+        exit 1
+    fi
+
+    create_default_config
+
+    # Check station exists
+    local existing=$(grep "^${station_id}|" "$CONFIG_FILE" 2>/dev/null | head -1)
+    if [ -z "$existing" ]; then
+        echo "Error: estación $station_id no encontrada" >&2
+        exit 1
+    fi
+
+    # Check name collision with OTHER stations
+    if grep -Fq "|$name|" "$CONFIG_FILE"; then
+        local other_id=$(grep -F "|$name|" "$CONFIG_FILE" | cut -d'|' -f1 | head -1)
+        if [ "$other_id" != "$station_id" ]; then
+            echo "Error: la estación "$name" ya existe (id $other_id)" >&2
+            exit 1
+        fi
+    fi
+
+    local tmp
+    tmp=$(mktemp "$CONFIG_DIR/.stations.conf.XXXXXX") 2>/dev/null
+    if [ -z "$tmp" ]; then
+        echo "Error: no se pudo crear el archivo temporal de configuración" >&2
+        exit 1
+    fi
+
+    # Replace the line for this id
+    awk -F'|' -v id="$station_id" -v name="$name" -v url="$url" '
+        $1 == id { print id "|" name "|" url; next }
+        { print }
+    ' "$CONFIG_FILE" > "$tmp"
+
+    if ! mv "$tmp" "$CONFIG_FILE"; then
+        rm -f "$tmp"
+        echo "Error: no se pudo actualizar la configuración" >&2
+        exit 1
+    fi
+
+    echo "✓ Estación $station_id actualizada: $name"
 }
 
+# Delete a station (S2): remove line, renumber ids 1..N contiguously,
+# stop if it was the playing station.
+delete_station() {
+    local station_id="$1"
+
+    if [ -z "$station_id" ]; then
+        echo "Uso: $0 delete <id>" >&2
+        exit 1
+    fi
+    if ! [[ "$station_id" =~ ^[0-9]+$ ]]; then
+        echo "Error: id debe ser un número" >&2
+        exit 1
+    fi
+
+    create_default_config
+
+    # Check station exists
+    if ! grep -q "^${station_id}|" "$CONFIG_FILE"; then
+        echo "Error: estación $station_id no encontrada" >&2
+        exit 1
+    fi
+
+    # If deleting the currently playing station, stop first
+    if [ "$IS_PLAYING" = true ] && [ "$CURRENT_STATION" = "$station_id" ]; then
+        stop_radio
+    fi
+
+    local tmp
+    tmp=$(mktemp "$CONFIG_DIR/.stations.conf.XXXXXX") 2>/dev/null
+    if [ -z "$tmp" ]; then
+        echo "Error: no se pudo crear el archivo temporal de configuración" >&2
+        exit 1
+    fi
+
+    # Delete the line and renumber remaining sequentially 1..N
+    awk -F'|' -v del_id="$station_id" '
+        $1 == del_id { next }
+        $1 ~ /^[0-9]+$/ { print ++n "|" $2 "|" $3; next }
+        { print }
+    ' "$CONFIG_FILE" > "$tmp"
+
+    if ! mv "$tmp" "$CONFIG_FILE"; then
+        rm -f "$tmp"
+        echo "Error: no se pudo actualizar la configuración" >&2
+        exit 1
+    fi
+
+    # If current station was > deleted id, decrement it
+    if [ "$CURRENT_STATION" -gt "$station_id" ]; then
+        CURRENT_STATION=$((CURRENT_STATION - 1))
+        save_state
+    fi
+
+    echo "✓ Estación $station_id eliminada"
+}
 # Set volume
 set_volume() {
     local new_vol=$1
@@ -316,6 +454,13 @@ case "${1:-status}" in
     add)
         add_station "${2:-}" "${3:-}"
         ;;
+    update)
+        update_station "${2:-}" "${3:-}" "${4:-}"
+        ;;
+    delete)
+        delete_station "${2:-}"
+        ;;
+
     volume)
         set_volume "${2:-}"
         ;;
@@ -332,6 +477,8 @@ case "${1:-status}" in
         echo "  next           - Siguiente estación" >&2
         echo "  prev           - Estación anterior" >&2
         echo "  add <nombre> <url> - Agregar una estación a stations.conf" >&2
+        echo "  update <id> <nombre> <url> - Actualizar una estación" >&2
+        echo "  delete <id>           - Eliminar una estación" >&2
         echo "  volume <0-100>   - Cambiar volumen" >&2
         echo "  status         - Mostrar estado actual" >&2
         exit 1
