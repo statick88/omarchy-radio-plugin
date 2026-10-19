@@ -67,8 +67,7 @@ if [ -f "$SHELL_CONFIG" ]; then
         # Try to add to right layout using jq if available
         if command -v jq &> /dev/null; then
             # Add to right array if it exists, otherwise create it
-            jq '.bar.layout.right = (.bar.layout.right // []) + [{"id": "statick.radio"}]' \
-                "$SHELL_CONFIG" > "$SHELL_CONFIG.tmp" && mv "$SHELL_CONFIG.tmp" "$SHELL_CONFIG"
+            jq '.bar.layout.right = (.bar.layout.right // []) + [{"id": "statick.radio"}]'                 "$SHELL_CONFIG" > "$SHELL_CONFIG.tmp" && mv "$SHELL_CONFIG.tmp" "$SHELL_CONFIG"
             echo "✓ Widget agregado a la barra (shell.json)"
         else
             echo "   ⚠️  jq no encontrado. Agrega manualmente a shell.json:"

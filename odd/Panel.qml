@@ -5,7 +5,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import qs.Commons
-import qs.Ui
+import qs.Ui as Ui
 
 // Radio panel, laid out like the io.github.ricky.whatsapp panel: a header
 // row, a filtered list with an active row, and a bottom composer. Here the
@@ -296,7 +296,11 @@ Panel {
             }
 
             Text {
-              text: root.playing ? "Reproduciendo · estación " + root.currentStation : "Pausado"
+              text: (function() {
+                if (!root.playing) return "Pausado"
+                var station = root.stations.find(function(s) { return s.id === root.currentStation })
+                return station ? "Reproduciendo · " + station.name : "Reproduciendo · estación " + root.currentStation
+              })()
               color: root.playing ? Color.accent : Color.muted
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
@@ -308,25 +312,25 @@ Panel {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(4)
 
-            PanelActionButton {
+            Ui.PanelActionButton {
               iconText: "⏮"
               tooltipText: "Estación anterior"
               onClicked: root.runControl(["prev"])
             }
 
-            PanelActionButton {
+            Ui.PanelActionButton {
               iconText: root.playing ? "⏸" : "▶"
               tooltipText: root.playing ? "Pausar" : "Reproducir"
               onClicked: root.runControl(["toggle"])
             }
 
-            PanelActionButton {
+            Ui.PanelActionButton {
               iconText: "⏭"
               tooltipText: "Siguiente estación"
               onClicked: root.runControl(["next"])
             }
 
-            PanelActionButton {
+            Ui.PanelActionButton {
               iconText: "+"
               tooltipText: root.formOpen ? "Cerrar formulario" : "Agregar estación"
               onClicked: root.formOpen ? root.closeForm() : root.formOpen = true
@@ -441,7 +445,7 @@ Panel {
                   spacing: Style.space(4)
                   visible: rowMouse.containsMouse && !root.addBusy && !root.deleteBusy
 
-                  PanelActionButton {
+                  Ui.PanelActionButton {
                     id: editBtn
                     iconText: "✎"
                     tooltipText: "Editar estación"
@@ -456,7 +460,7 @@ Panel {
                     }
                   }
 
-                  PanelActionButton {
+                  Ui.PanelActionButton {
                     id: deleteBtn
                     iconText: "🗑"
                     tooltipText: "Eliminar estación"
@@ -530,7 +534,7 @@ Panel {
           Row {
             spacing: Style.space(6)
 
-            PanelActionButton {
+            Ui.PanelActionButton {
               id: saveBtn
               iconText: " "
               tooltipText: root.editingId !== null ? "Actualizar estación" : "Guardar estación"
@@ -538,7 +542,7 @@ Panel {
               onClicked: root.submitStation()
             }
 
-            PanelActionButton {
+            Ui.PanelActionButton {
               iconText: "✕"
               tooltipText: "Cancelar"
               onClicked: root.closeForm()
