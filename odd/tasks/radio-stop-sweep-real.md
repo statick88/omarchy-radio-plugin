@@ -84,3 +84,8 @@ comandos contenga alguna URL configurada, en lugar de una lista fija de hosts:
   (stop mata stream Exa). 2 de 3 hallazgos corregidos; R4-PLAYBACK-LIVENESS
   deferido por flakiness del test. Review abandonado por bloqueo de transporte.
   Decisión: deliver sin review completa, respaldado por tests + verificación en vivo.
+- L7 (nueva iteración): Agregadas 3 estaciones (Ritmo Romántica, Boquerón 93.7, Stereo Macará 104.5)
+  con streams verificados (mdstrm CDN, hospedandosites, streamseguro). Eliminadas
+  Radio Paradise, SomaFM Groove Salad, SomaFM Drone Zone. Config final: 4 estaciones
+  (Exa + 3 nuevas). Tests 5/5 suites verdes, switch sin leaks, stop limpia todo.
+  Radio Zapotillo pendiente (no se encontró stream URL funcional).
