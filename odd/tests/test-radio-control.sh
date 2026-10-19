@@ -508,6 +508,10 @@ EOF
     PATH="$SHIM_DIR:$PATH" "$RADIO_SCRIPT" play 2 > /dev/null 2>&1 || true
     wait_for_log "MPV .*two.aac" || return 1
 
+    echo "[DBG] grep PKILL one:"; grep "PKILL .*stream.host.test/one.aac" "$SHIM_LOG" || echo "NOT FOUND"
+    echo "[DBG] count MPV:"; grep -c "^MPV " "$SHIM_LOG"
+    echo "[DBG] grep MPV two:"; grep "MPV .*two.aac" "$SHIM_LOG" || echo "NOT FOUND"
+    echo "[DBG] state:"; cat "$HOME/.config/omarchy-radio/state"
     # Station 1's stream must be swept even though no pid file pointed at it
     grep -q "PKILL .*stream.host.test/one.aac" "$SHIM_LOG" || return 1
     # And exactly one player must be left: the newly selected station

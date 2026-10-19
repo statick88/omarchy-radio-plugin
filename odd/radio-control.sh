@@ -60,7 +60,8 @@ count_stations() {
         echo 0
         return
     fi
-    grep -c "^[0-9]" "$CONFIG_FILE" 2>/dev/null || echo 0
+    # Only lines that look like station entries: digit|name|url
+    grep -c '^[0-9][0-9]*|' "$CONFIG_FILE" 2>/dev/null || echo 0
 }
 
 # Play station
@@ -94,9 +95,10 @@ play_station() {
         exit 1
     fi
     
-    # Start mpv in background
+    # Start mpv in background with IPC socket for volume control
+    local socket_path="$HOME/.config/omarchy-radio/mpv-socket"
     echo "Reproduciendo: $station_name"
-    mpv --no-video --volume="$VOLUME" "$station_url" &
+    mpv --no-video --volume="$VOLUME" --input-ipc-server="$socket_path" "$station_url" &
     MPV_PID=$!
     
     # Save state
@@ -118,6 +120,9 @@ stop_radio() {
         fi
         rm -f "$PID_FILE"
     fi
+    
+    # Clean up IPC socket
+    rm -f "$HOME/.config/omarchy-radio/mpv-socket"
     
     # Also kill every mpv stream listed in stations.conf: the sweep comes
     # from the file, so any host (the default streamtheworld Exa stream, or a
@@ -266,7 +271,29 @@ add_station() {
     echo "✓ Estación agregada: $name"
 }
 
-# Main
+# Set volume
+set_volume() {
+    local new_vol=$1
+    if [ -z "$new_vol" ]; then
+        echo "Uso: $0 volume <0-100>" >&2
+        exit 1
+    fi
+    if ! [[ "$new_vol" =~ ^[0-9]+$ ]] || [ "$new_vol" -lt 0 ] || [ "$new_vol" -gt 100 ]; then
+        echo "Error: Volumen debe ser un número entre 0 y 100" >&2
+        exit 1
+    fi
+    VOLUME=$new_vol
+    save_state
+    # If mpv is running, update its volume via IPC
+    if [ -f "$PID_FILE" ]; then
+        local PID=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            echo '{ "command": ["set_property", "volume", '$VOLUME'] }' | \
+                socat - "$HOME/.config/omarchy-radio/mpv-socket" 2>/dev/null || true
+        fi
+    fi
+    echo "Volumen: $VOLUME%"
+}
 create_default_config
 load_state
 
@@ -289,6 +316,9 @@ case "${1:-status}" in
     add)
         add_station "${2:-}" "${3:-}"
         ;;
+    volume)
+        set_volume "${2:-}"
+        ;;
     status)
         show_status
         ;;
@@ -302,6 +332,7 @@ case "${1:-status}" in
         echo "  next           - Siguiente estación" >&2
         echo "  prev           - Estación anterior" >&2
         echo "  add <nombre> <url> - Agregar una estación a stations.conf" >&2
+        echo "  volume <0-100>   - Cambiar volumen" >&2
         echo "  status         - Mostrar estado actual" >&2
         exit 1
         ;;

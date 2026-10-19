@@ -518,7 +518,7 @@ Panel {
             from: 0
             to: 100
             value: root.volume
-            onMoved: root.volume = Math.round(value)
+            onMoved: root.runControl(["volume", String(Math.round(value))])
           }
 
           Text {
