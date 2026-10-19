@@ -1,0 +1,17 @@
+# Artefactos locales de progreso y agentes (no se versionan)
+.progress
+.agents/
+
+# Caché del skill registry (generada)
+.atl/.skill-registry.cache.json
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporales
+*.tmp
+*.temp
